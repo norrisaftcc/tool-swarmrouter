@@ -1,0 +1,27 @@
+# SwarmRouter (Waggle) - MVP Requirements
+# FastAPI-based AI model routing system
+
+# Core Dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# HTTP Client for Provider APIs
+aiohttp==3.9.1
+requests==2.31.0
+
+# Configuration and Environment
+python-dotenv==1.0.0
+
+# Logging and Monitoring
+structlog==23.2.0
+
+# Development Dependencies (MVP phase)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2  # For testing FastAPI endpoints
+
+# Optional: Future considerations
+# redis==5.0.1  # For caching and session management
+# prometheus-client==0.19.0  # For metrics collection
+# opentelemetry-api==1.21.0  # For distributed tracing
