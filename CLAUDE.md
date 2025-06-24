@@ -109,6 +109,9 @@ tool-swarmrouter/
 
 ## Current State (as of last interaction)
 
+### 📋 Persistent TODO List
+**See `docs/TODOS.md` for the complete, persistent task list that survives session interruptions.**
+
 ### Completed
 - Comprehensive documentation for HIVE architecture
 - Task decomposition following Agile practices
@@ -128,6 +131,7 @@ tool-swarmrouter/
 3. Create MCP protocol handlers
 4. Implement streaming HTTP/WebSocket support
 5. Add basic authentication
+6. **CRITICAL**: Implement persistent state management (see TODOS.md)
 
 ## Educational Focus
 
