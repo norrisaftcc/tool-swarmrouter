@@ -1,0 +1,37 @@
+{
+  "description": "Shadow Clone MCP Demo - Educational Task Delegation Server",
+  "version": "1.0.0",
+  "author": "SwarmRouter Education Team",
+  "license": "MIT",
+  "mcpServers": {
+    "shadowclone": {
+      "command": "node",
+      "args": ["server.js"],
+      "cwd": "./src/demo/shadowclone_mcp",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    "taskmaster-ai": {
+      "command": "uvx",
+      "args": ["mcp-server-taskmaster-ai"],
+      "env": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
+        "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}"
+      }
+    }
+  },
+  "education": {
+    "purpose": "Demonstrate hierarchical AI agent systems for coding education",
+    "concepts": [
+      "Task delegation and parallel processing",
+      "Specialized agent roles (ninjas)",
+      "Token efficiency through task distribution",
+      "Educational workflow patterns"
+    ],
+    "integration": {
+      "taskmaster": "Plans and decomposes high-level tasks",
+      "shadowclone": "Executes specialized coding tasks with ninja experts"
+    }
+  }
+}
