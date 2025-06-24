@@ -6,10 +6,12 @@ mcp>=1.1.0
 # FastMCP for rapid development
 fastmcp>=0.1.0
 
+# AI Clients
+anthropic>=0.34.0
+
 # Core dependencies
 pydantic>=2.0.0
 python-dotenv>=1.0.0
-asyncio>=3.4.3
 
 # Testing
 pytest>=8.0.0

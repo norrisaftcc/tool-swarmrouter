@@ -137,7 +137,7 @@ class TestTaskDelegator:
         assert all(bee.specialty == "architect" for bee in bees)
         
         # Test token allocation
-        expected_tokens = 1000  # (10000/3) * 0.3
+        expected_tokens = int((10000/3) * 0.3)  # Account for integer conversion
         assert all(bee.estimated_tokens == expected_tokens for bee in bees)
     
     def test_delegate_task_simple(self, delegator):
