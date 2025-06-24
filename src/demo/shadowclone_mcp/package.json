@@ -1,0 +1,30 @@
+{
+  "name": "shadowclone-mcp-server",
+  "version": "1.0.0",
+  "description": "Lightweight MCP server demonstrating task delegation with Naruto shadow clone metaphor",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "mcp",
+    "task-delegation",
+    "swarm-intelligence",
+    "naruto",
+    "shadow-clones"
+  ],
+  "author": "SwarmRouter Team",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "shadowclone-ninja": {
+      "command": "node",
+      "args": ["server.js"],
+      "cwd": "/path/to/your/tool-swarmrouter/src/demo/shadowclone_mcp",
+      "env": {
+        "NINJA_NAME": "Naruto Uzumaki",
+        "NINJA_VILLAGE": "Hidden Leaf Village"
+      }
+    }
+  }
+}
