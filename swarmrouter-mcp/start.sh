@@ -126,7 +126,7 @@ fi
 
 # Run tests to make sure everything works
 print_status "Running tests..."
-if python -m pytest tests/ --quiet --tb=short; then
+if python3 -m pytest tests/ --quiet --tb=short; then
     print_success "All tests passed!"
 else
     print_warning "Some tests failed, but server may still work"
