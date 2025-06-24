@@ -20,8 +20,10 @@ except ImportError:
     FastMCP = None
 
 from .models import (
-    TaskDelegationRequest, TaskDelegationResponse,
-    DanceType, TaskPriority
+    TaskDelegationRequest,
+    TaskDelegationResponse,
+    DanceType,
+    TaskPriority,
 )
 from .delegation import TaskDelegator
 
@@ -31,7 +33,7 @@ load_dotenv()
 # Configure logging
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,7 @@ logger = logging.getLogger(__name__)
 if FastMCP:
     mcp = FastMCP(
         name=os.getenv("MCP_SERVER_NAME", "SwarmRouter"),
-        version=os.getenv("MCP_SERVER_VERSION", "0.1.0")
+        version=os.getenv("MCP_SERVER_VERSION", "0.1.0"),
     )
 else:
     mcp = None
@@ -55,44 +57,46 @@ async def delegate_task_impl(
     task_type: Optional[str] = None,
     priority: str = "medium",
     max_tokens: int = 10000,
-    subtasks: Optional[list[str]] = None
+    subtasks: Optional[list[str]] = None,
 ) -> Dict:
     """Implementation of the delegate_task tool."""
     try:
         # Parse priority
         priority_enum = TaskPriority(priority.lower())
-        
+
         # Parse dance type if provided
         dance_type = None
         if task_type:
             try:
                 dance_type = DanceType(task_type.lower())
             except ValueError:
-                logger.warning(f"Invalid dance type '{task_type}', using auto-detection")
-        
+                logger.warning(
+                    f"Invalid dance type '{task_type}', using auto-detection"
+                )
+
         # Create delegation request
         request = TaskDelegationRequest(
             description=task_description,
             priority=priority_enum,
             max_tokens=max_tokens,
             preferred_dance=dance_type,
-            subtasks=subtasks
+            subtasks=subtasks,
         )
-        
+
         # Delegate to swarm
         task = delegator.delegate_task(request)
-        
+
         # Create response
         response = TaskDelegationResponse(
             task_id=task.task_id,
             dance_type=task.dance_type,
             assigned_bees=len(task.assigned_bees),
             estimated_token_savings=task.calculate_token_savings(),
-            message=f"Task delegated to {len(task.assigned_bees)} bees using {task.dance_type.value} dance"
+            message=f"Task delegated to {len(task.assigned_bees)} bees using {task.dance_type.value} dance",
         )
-        
+
         return response.model_dump()
-        
+
     except Exception as e:
         logger.error(f"Error delegating task: {e}", exc_info=True)
         return {"error": str(e)}
@@ -100,84 +104,93 @@ async def delegate_task_impl(
 
 # MCP Tool decorator (only if MCP is available)
 if mcp:
+
     @mcp.tool()
     async def delegate_task(
         task_description: str,
         task_type: Optional[str] = None,
         priority: str = "medium",
         max_tokens: int = 10000,
-        subtasks: Optional[list[str]] = None
+        subtasks: Optional[list[str]] = None,
     ) -> Dict:
         """
         Delegate a task to the bee swarm for efficient execution.
-        
+
         The swarm will analyze the task and assign appropriate bees using
         coordination patterns inspired by real bee behavior.
-        
+
         Args:
             task_description: Description of the task to delegate
             task_type: Type of bee dance (waggle, round, scout, tremble, converge, disperse)
             priority: Task priority (low, medium, high, critical)
             max_tokens: Maximum token budget for the task
             subtasks: Optional list of subtasks (auto-generated if not provided)
-        
+
         Returns:
             Task delegation result with ID and swarm assignment details
         """
         return await delegate_task_impl(
             task_description, task_type, priority, max_tokens, subtasks
         )
-    
+
     @mcp.tool()
     async def get_task_status(task_id: str) -> Dict:
         """
         Get the current status of a delegated task.
-        
+
         Args:
             task_id: The ID of the task to check
-            
+
         Returns:
             Current task status and assigned bee information
         """
         task = delegator.get_task_status(task_id)
         if not task:
             return {"error": f"Task {task_id} not found"}
-        
+
         return {
             "task_id": task.task_id,
             "status": task.status.value,
             "dance_type": task.dance_type.value,
             "assigned_bees": len(task.assigned_bees),
             "created_at": task.created_at.isoformat(),
-            "completed_at": task.completed_at.isoformat() if task.completed_at else None,
-            "token_savings": task.calculate_token_savings()
+            "completed_at": (
+                task.completed_at.isoformat() if task.completed_at else None
+            ),
+            "token_savings": task.calculate_token_savings(),
         }
-    
+
     @mcp.resource("swarm://status")
     async def get_swarm_status() -> Dict:
         """Get overall swarm status and statistics."""
         return delegator.get_swarm_statistics()
-    
+
     @mcp.resource("swarm://tasks")
     async def list_tasks() -> list[Dict]:
         """List all tasks in the swarm."""
         tasks = []
         for task in delegator.tasks.values():
-            tasks.append({
-                "task_id": task.task_id,
-                "description": task.description[:100] + "..." if len(task.description) > 100 else task.description,
-                "status": task.status.value,
-                "dance_type": task.dance_type.value,
-                "priority": task.priority.value,
-                "bee_count": len(task.assigned_bees)
-            })
+            tasks.append(
+                {
+                    "task_id": task.task_id,
+                    "description": (
+                        task.description[:100] + "..."
+                        if len(task.description) > 100
+                        else task.description
+                    ),
+                    "status": task.status.value,
+                    "dance_type": task.dance_type.value,
+                    "priority": task.priority.value,
+                    "bee_count": len(task.assigned_bees),
+                }
+            )
         return tasks
-    
+
     @mcp.prompt()
     def analyze_task_for_delegation(task_description: str) -> str:
         """
         Analyze a task to determine the best delegation strategy.
-        
+
         This prompt helps determine which bee dance type would be most
         appropriate for the given task.
         """
@@ -206,17 +219,17 @@ Suggest the optimal dance type and explain why."""
 async def test_server():
     """Test the server functionality without MCP."""
     logger.info("Testing SwarmRouter server...")
-    
+
     # Test task delegation
     result = await delegate_task_impl(
         task_description="Build a user authentication system with JWT tokens",
         task_type="waggle",
         priority="high",
-        max_tokens=15000
+        max_tokens=15000,
     )
-    
+
     logger.info(f"Delegation result: {result}")
-    
+
     # Get status
     if "task_id" in result:
         task = delegator.get_task_status(result["task_id"])
@@ -224,7 +237,7 @@ async def test_server():
         logger.info(f"Assigned bees: {len(task.assigned_bees)}")
         for i, bee in enumerate(task.assigned_bees):
             logger.info(f"  Bee {i+1}: {bee.bee_id} - {bee.assigned_task}")
-    
+
     # Get swarm stats
     stats = delegator.get_swarm_statistics()
     logger.info(f"Swarm statistics: {stats}")
@@ -234,6 +247,7 @@ if __name__ == "__main__":
     if not mcp:
         # Run test mode if MCP not available
         import asyncio
+
         asyncio.run(test_server())
     else:
         logger.info("SwarmRouter MCP server ready. Use 'mcp run server.py' to start.")
