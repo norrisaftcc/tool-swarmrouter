@@ -1,0 +1,21 @@
+# Minimal SwarmRouter MVP Requirements
+# 
+# Core dependencies for the stdout-based MCP server implementation
+# This version uses Python standard library as much as possible
+
+# Optional: For real AI integration (gracefully handles if not available)
+anthropic>=0.34.0
+
+# Optional: For environment variable management  
+python-dotenv>=1.0.0
+
+# No other dependencies required!
+# The minimal implementation uses only Python standard library:
+# - json (JSON serialization)
+# - sys (stdout/stdin/stderr)  
+# - os (environment variables)
+# - asyncio (async/await support)
+# - datetime (timestamps)
+# - enum (enumerations)
+# - typing (type hints)
+# - logging (debug output)
