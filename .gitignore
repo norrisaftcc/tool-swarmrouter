@@ -79,3 +79,6 @@ logs/*.txt
 tmp/
 temp/
 .tmp/
+
+# Node.js dependencies
+node_modules/
