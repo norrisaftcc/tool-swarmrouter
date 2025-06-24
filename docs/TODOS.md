@@ -48,10 +48,12 @@ Last Updated: 2025-06-24
 ## Low Priority / Future
 
 ### 🎓 Educational Materials
+- [x] Create example PR review walkthrough (completed)
 - [ ] Create video tutorials for GitHub workflow
 - [ ] Design hands-on labs for students
 - [ ] Build example contribution scenarios
 - [ ] Create assessment rubrics
+- [ ] Develop PR review assignment with grading rubric
 
 ### 🔮 Advanced Features
 - [ ] Implement swarm consensus mechanisms
