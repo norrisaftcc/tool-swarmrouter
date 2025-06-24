@@ -49,37 +49,66 @@ if [ ! -f "requirements.txt" ]; then
 fi
 
 # Check Python version
-python_version=$(python3 --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
-required_version="3.9"
-
 if ! command -v python3 &> /dev/null; then
     print_error "Python 3 is required but not installed."
+    print_status "Please install Python 3.9+ and try again."
     exit 1
 fi
 
+python_version=$(python3 --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
 print_status "Python $python_version detected"
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
-    print_status "Creating virtual environment..."
-    python3 -m venv venv
-    print_success "Virtual environment created"
-else
-    print_status "Virtual environment already exists"
-fi
+# Function to setup virtual environment
+setup_venv() {
+    if [ ! -d "venv" ]; then
+        print_status "Creating virtual environment..."
+        python3 -m venv venv
+        if [ $? -eq 0 ]; then
+            print_success "Virtual environment created"
+        else
+            print_error "Failed to create virtual environment"
+            exit 1
+        fi
+    else
+        print_status "Virtual environment found"
+    fi
 
-# Activate virtual environment
-print_status "Activating virtual environment..."
-source venv/bin/activate
+    # Activate virtual environment
+    print_status "Activating virtual environment..."
+    source venv/bin/activate
+    
+    # Verify activation worked
+    if [ "$VIRTUAL_ENV" = "" ]; then
+        print_error "Failed to activate virtual environment"
+        exit 1
+    fi
+    
+    print_success "Virtual environment activated: $VIRTUAL_ENV"
 
-# Upgrade pip
-print_status "Upgrading pip..."
-pip install --upgrade pip --quiet
+    # Upgrade pip
+    print_status "Upgrading pip..."
+    pip install --upgrade pip --quiet
+    if [ $? -ne 0 ]; then
+        print_warning "pip upgrade failed, continuing anyway..."
+    fi
 
-# Install dependencies
-print_status "Installing dependencies..."
-pip install -r requirements.txt --quiet
-print_success "Dependencies installed"
+    # Check if dependencies need installing
+    if ! pip show fastmcp > /dev/null 2>&1; then
+        print_status "Installing dependencies..."
+        pip install -r requirements.txt --quiet
+        if [ $? -eq 0 ]; then
+            print_success "Dependencies installed"
+        else
+            print_error "Failed to install dependencies"
+            exit 1
+        fi
+    else
+        print_status "Dependencies already installed"
+    fi
+}
+
+# Always ensure venv is set up and activated
+setup_venv
 
 # Check for .env file
 if [ ! -f ".env" ]; then
@@ -128,10 +157,22 @@ case "${1:-}" in
         print_status "Starting MCP server..."
         if [ ! -f ".env" ] || ! grep -q "ANTHROPIC_API_KEY=" .env; then
             print_warning "No API key found. Running in demo mode..."
-            python -m src.server
+            # Try different ways to run the server
+            if python -c "import mcp" 2>/dev/null; then
+                print_status "Using MCP development server..."
+                mcp dev src/server.py
+            else
+                print_status "Running server in standalone mode..."
+                cd src && python server.py
+            fi
         else
             print_status "Starting with MCP protocol support..."
-            mcp dev src/server.py
+            if command -v mcp &> /dev/null; then
+                mcp dev src/server.py
+            else
+                print_status "MCP CLI not found, running in standalone mode..."
+                cd src && python server.py
+            fi
         fi
         ;;
     "queen-bee"|"demo")

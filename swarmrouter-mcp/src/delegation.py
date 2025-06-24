@@ -2,10 +2,18 @@
 
 import logging
 from typing import Dict, List, Optional
-from .models import (
-    DanceType, SwarmTask, BeeMetadata, TaskDelegationRequest,
-    TaskPriority, TaskStatus
-)
+# Handle both relative and absolute imports for flexibility
+try:
+    from .models import (
+        DanceType, SwarmTask, BeeMetadata, TaskDelegationRequest,
+        TaskPriority, TaskStatus
+    )
+except ImportError:
+    # Fallback for direct execution
+    from models import (
+        DanceType, SwarmTask, BeeMetadata, TaskDelegationRequest,
+        TaskPriority, TaskStatus
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +88,6 @@ class TaskDelegator:
         
         Different dances have different efficiency patterns.
         """
-        base_allocation = total_tokens // max(num_subtasks, 1)
-        
         # Apply dance-specific efficiency multipliers
         efficiency_multipliers = {
             DanceType.WAGGLE: 0.3,      # 70% savings - complex decomposition
@@ -93,7 +99,9 @@ class TaskDelegator:
         }
         
         multiplier = efficiency_multipliers.get(dance_type, 0.5)
-        return int(base_allocation * multiplier)
+        # Calculate allocation before integer division to maintain precision
+        allocation_per_bee = (total_tokens * multiplier) / max(num_subtasks, 1)
+        return int(allocation_per_bee)
     
     def create_bees_for_task(self, 
                             task: SwarmTask,

@@ -13,11 +13,18 @@ This pattern shows:
 
 import asyncio
 import os
+import sys
 from typing import List, Dict
 from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
 import json
 import time
+from pathlib import Path
+
+# Add parent directory to path so we can import src modules
+parent_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(parent_dir))
+sys.path.insert(0, str(parent_dir / "src"))
 
 load_dotenv()
 

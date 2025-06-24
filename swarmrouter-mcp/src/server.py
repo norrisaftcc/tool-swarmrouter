@@ -19,11 +19,23 @@ except ImportError:
     print("Warning: mcp package not installed. Install with: pip install 'mcp[cli]'")
     FastMCP = None
 
-from .models import (
-    TaskDelegationRequest, TaskDelegationResponse,
-    DanceType, TaskPriority
-)
-from .delegation import TaskDelegator
+# Handle both relative and absolute imports for flexibility
+try:
+    from .models import (
+        TaskDelegationRequest, TaskDelegationResponse,
+        DanceType, TaskPriority
+    )
+    from .delegation import TaskDelegator
+except ImportError:
+    # Fallback for direct execution
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent))
+    from models import (
+        TaskDelegationRequest, TaskDelegationResponse,
+        DanceType, TaskPriority
+    )
+    from delegation import TaskDelegator
 
 # Load environment variables
 load_dotenv()
