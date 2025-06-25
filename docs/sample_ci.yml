@@ -1,0 +1,551 @@
+# Sample CI/CD Workflow for Python Projects
+# This workflow provides comprehensive testing, linting, and type checking
+# for Python projects with AI-enhanced code quality validation
+
+name: Python CI/CD Pipeline
+
+# Trigger workflow on various events
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**.py'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**.py'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+  workflow_dispatch:  # Allow manual triggering
+  schedule:
+    # Run nightly builds to catch dependency issues
+    - cron: '0 2 * * *'
+
+# Define environment variables
+env:
+  PYTHON_VERSION: '3.11'
+  POETRY_VERSION: '1.6.1'
+
+# Cancel in-progress workflows for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job 1: Code Quality and Linting
+  lint-and-format:
+    name: Code Quality & Formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
+      
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install black isort flake8 mypy bandit safety
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      
+      - name: Run Black (Code Formatting)
+        run: |
+          black --check --diff --color .
+        continue-on-error: false
+      
+      - name: Run isort (Import Sorting)
+        run: |
+          isort --check-only --diff --color .
+        continue-on-error: false
+      
+      - name: Run Flake8 (Linting)
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+      
+      - name: Run Bandit (Security Linting)
+        run: |
+          bandit -r . -f json -o bandit-report.json || true
+          bandit -r . --severity-level medium
+        continue-on-error: true
+      
+      - name: Run Safety (Dependency Security Check)
+        run: |
+          safety check --json --output safety-report.json || true
+          safety check
+        continue-on-error: true
+      
+      - name: Upload Security Reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+          retention-days: 30
+
+  # Job 2: Type Checking
+  type-check:
+    name: Type Checking
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install mypy types-requests types-PyYAML
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      
+      - name: Run MyPy (Type Checking)
+        run: |
+          mypy . --ignore-missing-imports --show-error-codes --pretty
+        continue-on-error: false
+
+  # Job 3: Unit Testing Matrix
+  test:
+    name: Unit Tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+        exclude:
+          # Exclude some combinations to speed up CI
+          - os: windows-latest
+            python-version: '3.9'
+          - os: macos-latest
+            python-version: '3.9'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-asyncio pytest-xdist
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      
+      - name: Run Unit Tests with Coverage
+        run: |
+          pytest \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term-missing \
+            --cov-fail-under=80 \
+            --junit-xml=test-results.xml \
+            --verbose \
+            -n auto
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+      
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+      
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
+          path: |
+            test-results.xml
+            htmlcov/
+          retention-days: 30
+
+  # Job 4: Integration Testing
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [lint-and-format, type-check]
+    
+    services:
+      # Example: Add database services if needed
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio httpx
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      
+      - name: Wait for services
+        run: |
+          sleep 10
+          python -c "import psycopg2; psycopg2.connect('host=localhost port=5432 user=postgres password=postgres dbname=test_db')"
+          python -c "import redis; redis.Redis(host='localhost', port=6379).ping()"
+      
+      - name: Run Integration Tests
+        run: |
+          pytest tests/integration/ \
+            --verbose \
+            --junit-xml=integration-test-results.xml
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+          PYTHONPATH: ${{ github.workspace }}
+      
+      - name: Upload Integration Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-test-results
+          path: integration-test-results.xml
+          retention-days: 30
+
+  # Job 5: Performance Testing
+  performance-test:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-benchmark locust
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      
+      - name: Run Performance Tests
+        run: |
+          pytest tests/performance/ \
+            --benchmark-only \
+            --benchmark-json=benchmark.json \
+            --verbose
+      
+      - name: Upload Performance Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: benchmark.json
+          retention-days: 30
+
+  # Job 6: Build and Package
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [lint-and-format, type-check, test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for versioning
+      
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine wheel setuptools-scm
+      
+      - name: Build package
+        run: |
+          python -m build
+      
+      - name: Check package
+        run: |
+          twine check dist/*
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: package-dist
+          path: dist/
+          retention-days: 30
+
+  # Job 7: Documentation Build
+  docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install sphinx sphinx-rtd-theme myst-parser
+          if [ -f requirements-docs.txt ]; then pip install -r requirements-docs.txt; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      
+      - name: Build documentation
+        run: |
+          if [ -d "docs/" ]; then
+            cd docs/
+            make html || sphinx-build -b html . _build/html
+          fi
+      
+      - name: Upload documentation
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: documentation
+          path: docs/_build/html/
+          retention-days: 30
+
+  # Job 8: Security Scan
+  security-scan:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      security-events: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v2
+        with:
+          languages: python
+      
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:python"
+
+  # Job 9: Dependency Check
+  dependency-check:
+    name: Dependency Vulnerability Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety pip-audit
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      
+      - name: Run Safety Check
+        run: |
+          safety check --json --output safety-report.json || true
+          safety check
+        continue-on-error: true
+      
+      - name: Run Pip Audit
+        run: |
+          pip-audit --format=json --output=pip-audit-report.json || true
+          pip-audit
+        continue-on-error: true
+      
+      - name: Upload Dependency Reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: dependency-reports
+          path: |
+            safety-report.json
+            pip-audit-report.json
+          retention-days: 30
+
+  # Job 10: Deployment Preparation (on main branch only)
+  deploy-prep:
+    name: Prepare Deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [build, integration-test, security-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'norrisaftcc/tool-swarmrouter'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: package-dist
+          path: dist/
+      
+      - name: Create deployment package
+        run: |
+          mkdir -p deployment/
+          cp -r dist/ deployment/
+          cp requirements*.txt deployment/ || true
+          cp Dockerfile deployment/ || true
+          tar -czf deployment-package.tar.gz deployment/
+      
+      - name: Upload deployment package
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-package
+          path: deployment-package.tar.gz
+          retention-days: 90
+
+  # Job 11: Notification and Reporting
+  notify:
+    name: CI/CD Notifications
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [lint-and-format, type-check, test, integration-test, build, docs, security-scan]
+    if: always()
+    
+    steps:
+      - name: Determine overall status
+        id: status
+        run: |
+          if [[ "${{ needs.lint-and-format.result }}" == "success" && \
+                "${{ needs.type-check.result }}" == "success" && \
+                "${{ needs.test.result }}" == "success" && \
+                "${{ needs.integration-test.result }}" == "success" && \
+                "${{ needs.build.result }}" == "success" && \
+                "${{ needs.docs.result }}" == "success" && \
+                "${{ needs.security-scan.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create CI Summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## CI/CD Pipeline Results
+          
+          | Job | Status |
+          |-----|--------|
+          | Code Quality & Formatting | ${{ needs.lint-and-format.result }} |
+          | Type Checking | ${{ needs.type-check.result }} |
+          | Unit Tests | ${{ needs.test.result }} |
+          | Integration Tests | ${{ needs.integration-test.result }} |
+          | Build Package | ${{ needs.build.result }} |
+          | Documentation | ${{ needs.docs.result }} |
+          | Security Scan | ${{ needs.security-scan.result }} |
+          
+          **Overall Status**: ${{ steps.status.outputs.status }}
+          
+          ### Key Metrics
+          - Python Version: ${{ env.PYTHON_VERSION }}
+          - Workflow Duration: ${{ github.event.workflow_run.run_started_at }}
+          - Commit: ${{ github.sha }}
+          - Branch: ${{ github.ref_name }}
+          EOF
+
+# Additional workflow configuration
+env:
+  # Customize these environment variables for your project
+  PROJECT_NAME: "tool-swarmrouter"
+  MAIN_BRANCH: "main"
+  PYTHON_PATH: "src/"
+  
+  # CI/CD configuration
+  FAIL_FAST: "false"
+  PYTEST_WORKERS: "auto"
+  COVERAGE_THRESHOLD: "80"
+  
+  # Security settings
+  BANDIT_SEVERITY: "medium"
+  SAFETY_IGNORE_CVE: ""  # Comma-separated list of CVEs to ignore
+  
+  # Performance settings
+  BENCHMARK_THRESHOLD: "1.5"  # Fail if performance degrades by more than 50%
